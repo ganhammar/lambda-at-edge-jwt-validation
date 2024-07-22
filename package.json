@@ -1,0 +1,35 @@
+{
+  "name": "cloudfront-function-jwt-validation",
+  "version": "1.0.0",
+  "description": "",
+  "main": "dist/index.js",
+  "type": "module",
+  "scripts": {
+    "build": "node build.js",
+    "test": "vitest",
+    "format": "prettier -c src",
+    "format:fix": "prettier -w src"
+  },
+  "keywords": [],
+  "author": "Anton Ganhammar",
+  "license": "ISC",
+  "dependencies": {
+    "@aws-sdk/client-ssm": "^3.616.0",
+    "aws-lambda": "^1.0.7",
+    "hono": "^4.5.1",
+    "jsonwebtoken": "^9.0.2",
+    "node-jose": "^2.2.0"
+  },
+  "devDependencies": {
+    "@tsconfig/node20": "^20.1.4",
+    "@types/aws-lambda": "^8.10.141",
+    "@types/jsonwebtoken": "^9.0.6",
+    "@types/node-jose": "^1.1.13",
+    "@types/pem": "^1.14.4",
+    "aws-sdk-client-mock": "^4.0.1",
+    "esbuild": "^0.23.0",
+    "pem": "^1.14.8",
+    "prettier": "^3.3.3",
+    "vitest": "^2.0.3"
+  }
+}

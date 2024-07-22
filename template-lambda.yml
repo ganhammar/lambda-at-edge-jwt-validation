@@ -1,0 +1,54 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: 'AWS::Serverless-2016-10-31'
+Resources:
+  AuthorizerFunction:
+    Type: 'AWS::Serverless::Function'
+    Properties:
+      CodeUri: './'
+      Handler: 'dist/authorizer/index.handler'
+      Runtime: 'nodejs20.x'
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Policies:
+        - PolicyName: 'LambdaSSMReadPolicy'
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: 'Allow'
+                Action:
+                  - 'ssm:GetParameter'
+                Resource:
+                  - !Sub 'arn:aws:ssm:eu-north-1:${AWS::AccountId}:parameter/OpenIddictServerlessDemo/Certificates/EncryptionCertificate'
+                  - !Sub 'arn:aws:ssm:eu-north-1:${AWS::AccountId}:parameter/OpenIddictServerlessDemo/Certificates/SigningCertificate'
+      MemorySize: 128
+      Timeout: 10
+      AutoPublishAlias: 'live'
+    Metadata:
+      BuildMethod: makefile
+  LambdaExecutionRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: 'Allow'
+            Principal:
+              Service:
+                - 'lambda.amazonaws.com'
+                - 'edgelambda.amazonaws.com'
+            Action: 'sts:AssumeRole'
+      Policies:
+        - PolicyName: 'LambdaSSMReadPolicy'
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: 'Allow'
+                Action:
+                  - 'ssm:GetParameter'
+                Resource:
+                  - !Sub 'arn:aws:ssm:eu-north-1:${AWS::AccountId}:parameter/OpenIddictServerlessDemo/Certificates/EncryptionCertificate'
+                  - !Sub 'arn:aws:ssm:eu-north-1:${AWS::AccountId}:parameter/OpenIddictServerlessDemo/Certificates/SigningCertificate'
+Outputs:
+  AuthorizerFunctionVersionArn:
+    Value: !Ref AuthorizerFunction.Version
+    Export:
+      Name: AuthorizerFunctionVersionArn

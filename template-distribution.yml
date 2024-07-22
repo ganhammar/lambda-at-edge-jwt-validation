@@ -1,0 +1,71 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Parameters:
+  LambdaFunctionVersionArn:
+    Type: 'String'
+
+Resources:
+  PrivateWebBucket:
+    Type: 'AWS::S3::Bucket'
+
+  PrivateWebPolicy:
+    Type: 'AWS::S3::BucketPolicy'
+    Properties:
+      Bucket: !Ref PrivateWebBucket
+      PolicyDocument:
+        Statement:
+          - Action: 's3:GetObject'
+            Resource: !Sub '${PrivateWebBucket.Arn}/*'
+            Principal:
+              Service: 'cloudfront.amazonaws.com'
+            Condition:
+              StringEquals:
+                'AWS:SourceArn': !Sub 'arn:aws:cloudfront::${AWS::AccountId}:distribution/${EdgeJwtValidationDistribution}'
+            Effect: 'Allow'
+
+  EdgeJwtValidationDistribution:
+    Type: 'AWS::CloudFront::Distribution'
+    Properties:
+      DistributionConfig:
+        Origins:
+          - Id: 'S3Origin'
+            DomainName: !GetAtt PrivateWebBucket.DomainName
+            S3OriginConfig:
+              OriginAccessIdentity: ''
+            OriginAccessControlId: !GetAtt S3OriginAccessControl.Id
+        DefaultCacheBehavior:
+          TargetOriginId: 'S3Origin'
+          ViewerProtocolPolicy: 'redirect-to-https'
+          ForwardedValues:
+            QueryString: false
+            Cookies:
+              Forward: 'none'
+            Headers:
+              - 'Authorization'
+        CacheBehaviors:
+          - PathPattern: '*'
+            TargetOriginId: 'S3Origin'
+            ViewerProtocolPolicy: 'redirect-to-https'
+            ForwardedValues:
+              QueryString: false
+              Cookies:
+                Forward: 'none'
+              Headers:
+                - 'Authorization'
+            LambdaFunctionAssociations:
+              - EventType: 'origin-request'
+                LambdaFunctionARN: !Ref LambdaFunctionVersionArn
+        Enabled: true
+
+  S3OriginAccessControl:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: PrivateWenS3OriginAccessControl
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+
+Outputs:
+  PrivateWebBucketName:
+    Description: 'Name of the S3 bucket'
+    Value: !Ref PrivateWebBucket
