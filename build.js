@@ -1,12 +1,17 @@
 import { build } from 'esbuild';
 
-const entryPoint = './src/authorizer/index.ts';
+const entryPoints = [
+  'api',
+  'authorizer',
+];
 
-build({
-  entryPoints: [entryPoint],
-  bundle: true,
-  platform: 'node',
-  target: 'node20',
-  outfile: 'dist/authorizer/index.js',
-  external: ['aws-sdk'],
-}).catch(() => process.exit(1));
+entryPoints.forEach((entryPoint) => {
+  build({
+    entryPoints: [`src/${entryPoint}/index.ts`],
+    bundle: true,
+    platform: 'node',
+    target: 'node20',
+    outfile: `dist/${entryPoint}/index.js`,
+    external: ['aws-sdk'],
+  }).catch(() => process.exit(1));
+});

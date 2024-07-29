@@ -1,39 +1,48 @@
 AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: 'A template for a CloudFront distribution with a Lambda@Edge function for JWT validation'
+
 Parameters:
-  LambdaFunctionVersionArn:
+  AuthorizerFunctionVersionArn:
     Type: 'String'
 
 Resources:
-  PrivateWebBucket:
-    Type: 'AWS::S3::Bucket'
-
-  PrivateWebPolicy:
-    Type: 'AWS::S3::BucketPolicy'
+  ApiFunction:
+    Type: 'AWS::Serverless::Function'
     Properties:
-      Bucket: !Ref PrivateWebBucket
-      PolicyDocument:
+      CodeUri: './'
+      Handler: 'dist/api/index.handler'
+      Runtime: 'nodejs20.x'
+      Role: !GetAtt LambdaExecutionRole.Arn
+      MemorySize: 128
+      Timeout: 10
+      FunctionUrlConfig:
+        AuthType: AWS_IAM
+    Metadata:
+      BuildMethod: makefile
+
+  LambdaExecutionRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
         Statement:
-          - Action: 's3:GetObject'
-            Resource: !Sub '${PrivateWebBucket.Arn}/*'
+          - Effect: 'Allow'
             Principal:
-              Service: 'cloudfront.amazonaws.com'
-            Condition:
-              StringEquals:
-                'AWS:SourceArn': !Sub 'arn:aws:cloudfront::${AWS::AccountId}:distribution/${EdgeJwtValidationDistribution}'
-            Effect: 'Allow'
+              Service: 'lambda.amazonaws.com'
+            Action: 'sts:AssumeRole'
 
   EdgeJwtValidationDistribution:
     Type: 'AWS::CloudFront::Distribution'
     Properties:
       DistributionConfig:
         Origins:
-          - Id: 'S3Origin'
-            DomainName: !GetAtt PrivateWebBucket.DomainName
-            S3OriginConfig:
-              OriginAccessIdentity: ''
-            OriginAccessControlId: !GetAtt S3OriginAccessControl.Id
+          - Id: 'LambdaOrigin'
+            DomainName: !Select [2, !Split ['/', !GetAtt ApiFunctionUrl.FunctionUrl]]
+            CustomOriginConfig:
+              OriginProtocolPolicy: 'https-only'
         DefaultCacheBehavior:
-          TargetOriginId: 'S3Origin'
+          TargetOriginId: 'LambdaOrigin'
           ViewerProtocolPolicy: 'redirect-to-https'
           ForwardedValues:
             QueryString: false
@@ -41,9 +50,12 @@ Resources:
               Forward: 'none'
             Headers:
               - 'Authorization'
+          LambdaFunctionAssociations:
+            - EventType: 'origin-request'
+              LambdaFunctionARN: !Ref AuthorizerFunctionVersionArn
         CacheBehaviors:
           - PathPattern: '*'
-            TargetOriginId: 'S3Origin'
+            TargetOriginId: 'LambdaOrigin'
             ViewerProtocolPolicy: 'redirect-to-https'
             ForwardedValues:
               QueryString: false
@@ -53,19 +65,21 @@ Resources:
                 - 'Authorization'
             LambdaFunctionAssociations:
               - EventType: 'origin-request'
-                LambdaFunctionARN: !Ref LambdaFunctionVersionArn
+                LambdaFunctionARN: !Ref AuthorizerFunctionVersionArn
         Enabled: true
 
-  S3OriginAccessControl:
-    Type: AWS::CloudFront::OriginAccessControl
+  LambdaFunctionUrlPolicy:
+    Type: 'AWS::IAM::Policy'
     Properties:
-      OriginAccessControlConfig:
-        Name: PrivateWenS3OriginAccessControl
-        OriginAccessControlOriginType: s3
-        SigningBehavior: always
-        SigningProtocol: sigv4
-
-Outputs:
-  PrivateWebBucketName:
-    Description: 'Name of the S3 bucket'
-    Value: !Ref PrivateWebBucket
+      PolicyName: 'LambdaFunctionUrlPolicy'
+      Roles:
+        - !Ref LambdaExecutionRole
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: 'Allow'
+            Action: 'lambda:InvokeFunctionUrl'
+            Resource: !GetAtt ApiFunctionUrl.FunctionUrl
+            Condition:
+              StringEquals:
+                'aws:Referer': !Sub 'arn:aws:cloudfront::${AWS::AccountId}:distribution/${EdgeJwtValidationDistribution}'

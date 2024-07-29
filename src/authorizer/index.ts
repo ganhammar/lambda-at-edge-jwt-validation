@@ -1,6 +1,6 @@
 import { CloudFrontRequestEvent } from 'aws-lambda';
 import { SSMClient, GetParameterCommand } from '@aws-sdk/client-ssm';
-import jwt from 'jsonwebtoken';
+import jwt, { JwtPayload } from 'jsonwebtoken';
 import { JWK, JWE } from 'node-jose';
 
 const ALLOWED_ISSUERS = ['https://evc2aaatab.execute-api.eu-north-1.amazonaws.com/'];
@@ -43,16 +43,15 @@ export const handler = async (event: CloudFrontRequestEvent) => {
     }
 
     try {
-      await validateToken(authHeader, signingResponse.Parameter.Value, encryptionResponse.Parameter.Value);
+      const result = await validateToken(authHeader, signingResponse.Parameter.Value, encryptionResponse.Parameter.Value);
+      request.headers['x-user-id'] = [{ key: 'X-User-Id', value: result.sub ?? '' }];
+      request.headers['x-user-email'] = [{ key: 'X-User-Email', value: result.email ?? '' }];
     } catch (error) {
       console.error('Could not validate token', error);
       return respond('401', 'Unauthorized', 'User is not authenticated');
     }
 
-    // Remove the authorization header before sending the request to S3
-    delete request.headers['authorization'];
-
-    // Allow the request to proceed to the origin (S3 bucket)
+    // Allow the request to proceed to the origin
     return request;
   } catch (error) {
     console.error('An error occurred while fetching SSM parameters.', error);
@@ -68,7 +67,7 @@ export async function validateToken(
   bearer: string,
   signingCertificateRaw: string,
   encryptionCertificateRaw: string
-) {
+) : Promise<JwtPayload> {
   return new Promise(async (resolve, reject) => {
     try {
       const token = bearer.replace('Bearer ', '');
@@ -96,6 +95,9 @@ export async function validateToken(
           if (err) {
             console.error('Error validating token', err);
             reject('Invalid token');
+          } else if (!decoded || typeof decoded !== 'object') {
+            console.error('Token validation failed');
+            reject('Token validation failed');
           } else {
             resolve(decoded);
           }

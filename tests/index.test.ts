@@ -112,5 +112,12 @@ it('should validate the token', async () => {
     ],
   });
 
-  expect(result).toEqual(request);
+  expect(result).toEqual({
+    ...request,
+    headers: {
+      ...request.headers,
+      'x-user-id': [{ key: 'X-User-Id', value: '1234567890' }],
+      'x-user-email': [{ key: 'X-User-Email', value: '' }],
+    }
+  });
 });
