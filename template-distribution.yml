@@ -11,75 +11,56 @@ Resources:
     Type: 'AWS::Serverless::Function'
     Properties:
       CodeUri: './'
-      Handler: 'dist/api/index.handler'
+      Handler: 'api/index.handler'
       Runtime: 'nodejs20.x'
-      Role: !GetAtt LambdaExecutionRole.Arn
-      MemorySize: 128
+      MemorySize: 768
       Timeout: 10
       FunctionUrlConfig:
         AuthType: AWS_IAM
     Metadata:
       BuildMethod: makefile
 
-  LambdaExecutionRole:
-    Type: 'AWS::IAM::Role'
+  ApiFunctionPermission:
+    Type: AWS::Lambda::Permission
     Properties:
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: 'Allow'
-            Principal:
-              Service: 'lambda.amazonaws.com'
-            Action: 'sts:AssumeRole'
+      Action: lambda:InvokeFunctionUrl
+      FunctionName: !Ref ApiFunction
+      Principal: cloudfront.amazonaws.com
+      SourceArn: !Sub 'arn:aws:cloudfront::${AWS::AccountId}:distribution/${EdgeJwtValidationDistribution}'
 
   EdgeJwtValidationDistribution:
     Type: 'AWS::CloudFront::Distribution'
     Properties:
       DistributionConfig:
+        DefaultCacheBehavior:
+          TargetOriginId: 'LambdaOrigin'
+          ViewerProtocolPolicy: 'redirect-to-https'
+          CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad # CachingDisabled
+          OriginRequestPolicyId: b689b0a8-53d0-40ab-baf2-68738e2966ac # AllViewerExceptHostHeader
+          AllowedMethods:
+            - 'GET'
+            - 'HEAD'
+            - 'OPTIONS'
+            - 'PUT'
+            - 'PATCH'
+            - 'POST'
+            - 'DELETE'
+          LambdaFunctionAssociations:
+            - EventType: 'origin-request'
+              LambdaFunctionARN: !Ref AuthorizerFunctionVersionArn
+        Enabled: true
         Origins:
           - Id: 'LambdaOrigin'
             DomainName: !Select [2, !Split ['/', !GetAtt ApiFunctionUrl.FunctionUrl]]
             CustomOriginConfig:
               OriginProtocolPolicy: 'https-only'
-        DefaultCacheBehavior:
-          TargetOriginId: 'LambdaOrigin'
-          ViewerProtocolPolicy: 'redirect-to-https'
-          ForwardedValues:
-            QueryString: false
-            Cookies:
-              Forward: 'none'
-            Headers:
-              - 'Authorization'
-          LambdaFunctionAssociations:
-            - EventType: 'origin-request'
-              LambdaFunctionARN: !Ref AuthorizerFunctionVersionArn
-        CacheBehaviors:
-          - PathPattern: '*'
-            TargetOriginId: 'LambdaOrigin'
-            ViewerProtocolPolicy: 'redirect-to-https'
-            ForwardedValues:
-              QueryString: false
-              Cookies:
-                Forward: 'none'
-              Headers:
-                - 'Authorization'
-            LambdaFunctionAssociations:
-              - EventType: 'origin-request'
-                LambdaFunctionARN: !Ref AuthorizerFunctionVersionArn
-        Enabled: true
+            OriginAccessControlId: !Ref OAC
 
-  LambdaFunctionUrlPolicy:
-    Type: 'AWS::IAM::Policy'
+  OAC:
+    Type: AWS::CloudFront::OriginAccessControl
     Properties:
-      PolicyName: 'LambdaFunctionUrlPolicy'
-      Roles:
-        - !Ref LambdaExecutionRole
-      PolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: 'Allow'
-            Action: 'lambda:InvokeFunctionUrl'
-            Resource: !GetAtt ApiFunctionUrl.FunctionUrl
-            Condition:
-              StringEquals:
-                'aws:Referer': !Sub 'arn:aws:cloudfront::${AWS::AccountId}:distribution/${EdgeJwtValidationDistribution}'
+      OriginAccessControlConfig:
+        Name: ApiFunctionOAC
+        OriginAccessControlOriginType: lambda
+        SigningBehavior: always
+        SigningProtocol: sigv4

@@ -1,8 +1,8 @@
 build-AuthorizerFunction:
 	pnpm install
 	pnpm build
-	cp -r dist/authorizer "$(ARTIFACTS_DIR)/authorizer"
+	cp -r dist/authorizer "$(ARTIFACTS_DIR)"
 build-ApiFunction:
 	pnpm install
 	pnpm build
-	cp -r dist/api "$(ARTIFACTS_DIR)/api"
+	cp -r dist/api "$(ARTIFACTS_DIR)"

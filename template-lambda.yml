@@ -7,7 +7,7 @@ Resources:
     Type: 'AWS::Serverless::Function'
     Properties:
       CodeUri: './'
-      Handler: 'dist/authorizer/index.handler'
+      Handler: 'authorizer/index.handler'
       Runtime: 'nodejs20.x'
       Role: !GetAtt LambdaExecutionRole.Arn
       MemorySize: 128
