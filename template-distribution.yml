@@ -64,3 +64,9 @@ Resources:
         OriginAccessControlOriginType: lambda
         SigningBehavior: always
         SigningProtocol: sigv4
+
+Outputs:
+  DistributionId:
+    Value: !Ref EdgeJwtValidationDistribution
+    Export:
+      Name: DistributionId

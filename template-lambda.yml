@@ -10,7 +10,7 @@ Resources:
       Handler: 'authorizer/index.handler'
       Runtime: 'nodejs20.x'
       Role: !GetAtt LambdaExecutionRole.Arn
-      MemorySize: 128
+      MemorySize: 768
       Timeout: 10
       AutoPublishAlias: 'live'
     Metadata:
@@ -37,8 +37,24 @@ Resources:
                 Action:
                   - 'ssm:GetParameter'
                 Resource:
-                  - !Sub 'arn:aws:ssm:eu-north-1:${AWS::AccountId}:parameter/OpenIddictServerlessDemo/Certificates/EncryptionCertificate'
-                  - !Sub 'arn:aws:ssm:eu-north-1:${AWS::AccountId}:parameter/OpenIddictServerlessDemo/Certificates/SigningCertificate'
+                  - !Sub 'arn:aws:ssm:eu-north-1:${AWS::AccountId}:parameter/OpenIddictServerlessDemo/Certificates/*'
+        - PolicyName: 'LambdaAtEdgePolicy'
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - cloudfront:CreateDistribution
+                  - cloudfront:UpdateDistribution
+                  - cloudfront:GetDistribution
+                  - lambda:GetFunction
+                  - lambda:EnableReplication*
+                  - lambda:DisableReplication*
+                  - iam:CreateServiceLinkedRole
+                Resource:
+                  - !Sub 'arn:aws:cloudfront::${AWS::AccountId}:distribution/*'
+                  - !Sub 'arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:*'
+                  - !Sub 'arn:aws:iam::${AWS::AccountId}:role/*'
 
 Outputs:
   AuthorizerFunctionVersionArn:
