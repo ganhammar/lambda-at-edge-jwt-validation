@@ -1,7 +1,7 @@
 import { createCertificate, CertificateCreationResult } from 'pem';
 import { it, expect, beforeEach } from 'vitest';
 import { mockClient } from 'aws-sdk-client-mock';
-import { GetParameterCommand, SSMClient } from '@aws-sdk/client-ssm';
+import { GetParameterCommand, GetParametersByPathCommand, SSMClient } from '@aws-sdk/client-ssm';
 import jwt from 'jsonwebtoken';
 import { JWE, JWK } from 'node-jose';
 import { handler } from '../src/authorizer';
@@ -60,12 +60,12 @@ async function generateToken(signingKey: string, encryptionKey: string) {
 it('should validate the token', async () => {
   const { signing, encryption } = await createCertificates();
   ssmClient
-    .on(GetParameterCommand)
+    .on(GetParametersByPathCommand)
     .resolvesOnce({
-      Parameter: { Value: encryption },
-    })
-    .resolvesOnce({
-      Parameter: { Value: signing },
+      Parameters: [
+        { Name: '/OpenIddictServerlessDemo/Certificates/EncryptionCertificate', Value: encryption },
+        { Name: '/OpenIddictServerlessDemo/Certificates/SigningCertificate', Value: signing },
+      ],
     });
   const token = await generateToken(signing, encryption);
 
